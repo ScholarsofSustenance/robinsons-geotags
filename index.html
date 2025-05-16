@@ -1,21 +1,26 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Robinsons Geotag Routes</title>
+    <title>Robinsons Routes</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="button-container">
-        <button onclick="loadRoute('re')">RE Delivery Route</button>
-        <button onclick="loadRoute('qc')">Quezon City</button>
-        <button onclick="loadRoute('mpm')">Makati–Pasig–Muntinlupa</button>
+        <button onclick="loadRoute('re_delivery')">RE Delivery Route</button>
+        <button onclick="loadRoute('quezon_city')">Quezon City</button>
+        <button onclick="loadRoute('makati_pasim_muntinlupa')">Makati–Pasig–Muntinlupa</button>
         <button onclick="loadRoute('cavite_laguna')">Cavite + Laguna</button>
         <button onclick="loadRoute('rizal')">Rizal</button>
     </div>
-    <div id="map" style="height: 500px;"></div>
-    <div id="route-info"><h3>Route Info</h3><p>Select a route to display.</p></div>
+    <div id="map"></div>
+    <div id="route-info">
+        <h3>Route Info</h3>
+        <p>Select a route to display.</p>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
