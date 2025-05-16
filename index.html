@@ -1,0 +1,158 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>PLC + RE Delivery Routes</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+    body { margin: 0; font-family: 'Inter', sans-serif; background-color: #f9f9f9; }
+    #map { height: 70vh; width: 100%; }
+    #info-panel {
+      padding: 1rem;
+      background-color: #ffffff;
+      height: 30vh;
+      overflow-y: auto;
+      font-size: 1rem;
+      border-top: 1px solid #ddd;
+    }
+    .controls {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 0.5rem;
+      background-color: #eee;
+      border-bottom: 1px solid #ddd;
+    }
+    .controls button {
+      padding: 0.5rem 1rem;
+      border: none;
+      background: #343a40;
+      color: white;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .controls button:hover {
+      background: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <button onclick="loadRoute('re')">RE Delivery Route</button>
+    <button onclick="loadRoute('qc')">Quezon City</button>
+    <button onclick="loadRoute('mpm')">Makati–Pasig–Muntinlupa</button>
+    <button onclick="loadRoute('cavite_laguna')">Cavite + Laguna</button>
+    <button onclick="loadRoute('rizal')">Rizal</button>
+  </div>
+  <div id="map"></div>
+  <div id="info-panel"><h3 style='margin-top: 0;'>Route Info</h3><strong>Select a route to display.</strong></div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+
+  <script>
+    const map = L.map('map').setView([14.5, 121.0], 10);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+    }).addTo(map);
+
+    let currentLayerGroup = null;
+
+    const cityRoutes = {
+      re: [
+        { name: "RE Project 4", coords: [14.6368, 121.0769] },
+        { name: "RE UP Shopping Center", coords: [14.6548, 121.0691] },
+        { name: "RE Quezon Avenue", coords: [14.6393, 121.0317] },
+        { name: "RE Maginhawa", coords: [14.6377, 121.0581] },
+        { name: "RE Aurora Escalades", coords: [14.6193, 121.0618] }
+      ],
+      qc: [
+        { name: "Robinsons Galleria", coords: [14.590366, 121.060037] },
+        { name: "Robinsons Magnolia", coords: [14.614131, 121.037976] }
+      ],
+      mpm: [
+        { name: "Alabang Town Center", coords: [14.424657, 121.029266] },
+        { name: "Ayala Malls Feliz", coords: [14.619549, 121.094354] },
+        { name: "Power Plant Mall", coords: [14.565560, 121.036805] }
+      ],
+      cavite_laguna: [
+        { name: "Robinsons Gen. Trias", coords: [14.404019, 120.865264] },
+        { name: "Robinsons Tagaytay", coords: [14.097381, 120.942366] },
+        { name: "Robinsons Galleria South", coords: [14.352164, 121.061477] }
+      ],
+      rizal: [
+        { name: "Robinsons Antipolo", coords: [14.597089, 121.173153] }
+      ]
+    };
+
+    async function loadRoute(key) {
+      if (currentLayerGroup) {
+        map.removeLayer(currentLayerGroup);
+      }
+
+      const stops = cityRoutes[key];
+      const markerGroup = L.layerGroup();
+      const infoPanel = document.getElementById("info-panel");
+      infoPanel.innerHTML = `<h3 style='margin-top: 0;'>${key === 'mpm' ? 'Makati–Pasig–Muntinlupa' : key === 'cavite_laguna' ? 'Cavite + Laguna' : key.toUpperCase()} Route Info</h3>`;
+
+      if (!stops || stops.length < 1) return;
+
+      stops.forEach(loc => {
+        markerGroup.addLayer(L.marker(loc.coords).bindPopup(loc.name));
+      });
+
+      if (stops.length < 2) {
+        currentLayerGroup = markerGroup.addTo(map);
+        infoPanel.innerHTML += `<p>Only one location found. No route to calculate.</p>`;
+        return;
+      }
+
+      let allLayers = [markerGroup];
+
+      for (let i = 0; i < stops.length - 1; i++) {
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Delay and retry logic per request
+        let retries = 0;
+        let success = false;
+        while (retries < 3 && !success) {
+          await new Promise(resolve => setTimeout(resolve, 1500));
+        const segmentCoords = [stops[i].coords.slice().reverse(), stops[i + 1].coords.slice().reverse()];
+
+        try {
+          try {
+            const response = await axios.post('https://api.openrouteservice.org/v2/directions/driving-car/geojson', {
+            coordinates: segmentCoords,
+            radiuses: [100, 100]
+          }, {
+            headers: {
+              'Authorization': '5b3ce3597851110001cf62485d3643137a004d1192995b5cf526a066',
+              'Content-Type': 'application/json'
+            }
+          });
+
+          const segment = response.data;
+            success = true;
+          const summary = segment.features[0].properties.summary;
+
+          const routeLine = L.geoJSON(segment, { style: { color: 'blue', weight: 4 } });
+          allLayers.push(routeLine);
+
+          infoPanel.innerHTML += `<strong>${stops[i].name} ➝ ${stops[i + 1].name}</strong><br>
+                                  🛣️ ${(summary.distance / 1000).toFixed(2)} km |
+                                  ⏱️ ${(summary.duration / 60).toFixed(1)} min<br><br>`;
+        } catch (error) {
+          console.error(error);
+            retries++;
+          if (!success) infoPanel.innerHTML += `<p>❌ Failed to load segment (rate limit or routing error): ${stops[i].name} ➝ ${stops[i + 1].name} (after ${retries} retries)</p>`;
+        }
+      }
+
+      currentLayerGroup = L.layerGroup(allLayers).addTo(map);
+    }
+  </script>
+</body>
+</html>
